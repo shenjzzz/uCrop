@@ -66,8 +66,10 @@ public class OverlayView extends View {
     private float mPreviousTouchX = -1, mPreviousTouchY = -1;
     private int mCurrentTouchCornerIndex = -1;
     private int mTouchPointThreshold;
-    private int mCropRectMinSize;
+    private int mCropRectMinWidth, mCropRectMinHeight;
     private int mCropRectCornerTouchAreaLineLength;
+
+    private boolean mFixAspectRatio;
 
     private OverlayViewChangeListener mCallback;
 
@@ -75,7 +77,8 @@ public class OverlayView extends View {
 
     {
         mTouchPointThreshold = getResources().getDimensionPixelSize(R.dimen.ucrop_default_crop_rect_corner_touch_threshold);
-        mCropRectMinSize = getResources().getDimensionPixelSize(R.dimen.ucrop_default_crop_rect_min_size);
+        mCropRectMinHeight = getResources().getDimensionPixelSize(R.dimen.ucrop_default_crop_rect_min_size);
+        mCropRectMinWidth = mCropRectMinHeight;
         mCropRectCornerTouchAreaLineLength = getResources().getDimensionPixelSize(R.dimen.ucrop_default_crop_rect_corner_touch_area_line_length);
     }
 
@@ -129,6 +132,13 @@ public class OverlayView extends View {
     public void setFreestyleCropMode(@FreestyleMode int mFreestyleCropMode) {
         this.mFreestyleCropMode = mFreestyleCropMode;
         postInvalidate();
+    }
+
+    public void setFixAspectRatio(boolean fixAspectRatio) {
+        mFixAspectRatio = fixAspectRatio;
+        if (mFixAspectRatio && mTargetAspectRatio > 0) {
+            mCropRectMinWidth = (int) (mCropRectMinHeight * mTargetAspectRatio);
+        }
     }
 
     /**
@@ -357,18 +367,31 @@ public class OverlayView extends View {
     private void updateCropViewRect(float touchX, float touchY) {
         mTempRect.set(mCropViewRect);
 
+        boolean fixAspectRatio = mFixAspectRatio && mTargetAspectRatio > 0;
         switch (mCurrentTouchCornerIndex) {
             // resize rectangle
             case 0:
+                if (fixAspectRatio) {
+                    touchY = mCropViewRect.bottom - (mCropViewRect.right - touchX) / mTargetAspectRatio;
+                }
                 mTempRect.set(touchX, touchY, mCropViewRect.right, mCropViewRect.bottom);
                 break;
             case 1:
+                if (fixAspectRatio) {
+                    touchY = mCropViewRect.bottom - (touchX - mCropViewRect.left) / mTargetAspectRatio;
+                }
                 mTempRect.set(mCropViewRect.left, touchY, touchX, mCropViewRect.bottom);
                 break;
             case 2:
+                if (fixAspectRatio) {
+                    touchY = mCropViewRect.top + (touchX - mCropViewRect.left) / mTargetAspectRatio;
+                }
                 mTempRect.set(mCropViewRect.left, mCropViewRect.top, touchX, touchY);
                 break;
             case 3:
+                if (fixAspectRatio) {
+                    touchY = mCropViewRect.top + (mCropViewRect.right - touchX) / mTargetAspectRatio;
+                }
                 mTempRect.set(touchX, mCropViewRect.top, mCropViewRect.right, touchY);
                 break;
             // move rectangle
@@ -383,8 +406,8 @@ public class OverlayView extends View {
                 return;
         }
 
-        boolean changeHeight = mTempRect.height() >= mCropRectMinSize;
-        boolean changeWidth = mTempRect.width() >= mCropRectMinSize;
+        boolean changeHeight = mTempRect.height() >= mCropRectMinHeight;
+        boolean changeWidth = mTempRect.width() >= mCropRectMinWidth;
         mCropViewRect.set(
                 changeWidth ? mTempRect.left : mCropViewRect.left,
                 changeHeight ? mTempRect.top : mCropViewRect.top,

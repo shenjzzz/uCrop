@@ -9,10 +9,6 @@ import android.os.AsyncTask;
 import android.os.Build;
 import android.util.Log;
 
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-import androidx.exifinterface.media.ExifInterface;
-
 import com.yalantis.ucrop.callback.BitmapCropCallback;
 import com.yalantis.ucrop.model.CropParameters;
 import com.yalantis.ucrop.model.ExifInfo;
@@ -26,6 +22,10 @@ import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.ref.WeakReference;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.exifinterface.media.ExifInterface;
 
 /**
  * Crops part of image that fills the crop bounds.
@@ -60,6 +60,11 @@ public class BitmapCropTask extends AsyncTask<Void, Void, Throwable> {
     private int mCroppedImageWidth, mCroppedImageHeight;
     private int cropOffsetX, cropOffsetY;
 
+    private Matrix mVerticalPerspectiveMatrix;
+    private Matrix mHorizontalPerspectiveMatrix;
+    private Matrix mHorizontalReflectMatrix;
+    private Matrix mVerticalReflectMatrix;
+
     public BitmapCropTask(@NonNull Context context, @Nullable Bitmap viewBitmap, @NonNull ImageState imageState, @NonNull CropParameters cropParameters,
                           @Nullable BitmapCropCallback cropCallback) {
 
@@ -82,6 +87,11 @@ public class BitmapCropTask extends AsyncTask<Void, Void, Throwable> {
         mImageInputUri = cropParameters.getContentImageInputUri();
         mImageOutputUri = cropParameters.getContentImageOutputUri();
         mExifInfo = cropParameters.getExifInfo();
+
+        mVerticalReflectMatrix = imageState.getVerticalReflectMatrix();
+        mHorizontalReflectMatrix = imageState.getHorizontalReflectMatrix();
+        mVerticalPerspectiveMatrix = imageState.getVerticalPerspectiveMatrix();
+        mHorizontalPerspectiveMatrix = imageState.getHorizontalPerspectiveMatrix();
 
         mCropCallback = cropCallback;
     }
@@ -116,6 +126,20 @@ public class BitmapCropTask extends AsyncTask<Void, Void, Throwable> {
         if (context == null) {
             return false;
         }
+        Matrix current = new Matrix();
+        current.preConcat(mHorizontalReflectMatrix);
+        current.preConcat(mVerticalReflectMatrix);
+        current.preConcat(mHorizontalPerspectiveMatrix);
+        current.preConcat(mVerticalPerspectiveMatrix);
+        if (!current.isIdentity()) {
+            Bitmap bm = Bitmap.createBitmap(mViewBitmap,
+                    0, 0, mViewBitmap.getWidth(), mViewBitmap.getHeight(),
+                    current, false);
+            if (mViewBitmap != bm) {
+                mViewBitmap.recycle();
+            }
+            mViewBitmap = bm;
+        }
 
         // Downsize if needed
         if (mMaxResultImageSizeX > 0 && mMaxResultImageSizeY > 0) {
@@ -148,6 +172,7 @@ public class BitmapCropTask extends AsyncTask<Void, Void, Throwable> {
             Bitmap rotatedBitmap = Bitmap.createBitmap(mViewBitmap, 0, 0, mViewBitmap.getWidth(), mViewBitmap.getHeight(),
                     tempMatrix, true);
             if (mViewBitmap != rotatedBitmap) {
+
                 mViewBitmap.recycle();
             }
             mViewBitmap = rotatedBitmap;
@@ -158,7 +183,7 @@ public class BitmapCropTask extends AsyncTask<Void, Void, Throwable> {
         mCroppedImageWidth = Math.round(mCropRect.width() / mCurrentScale);
         mCroppedImageHeight = Math.round(mCropRect.height() / mCurrentScale);
 
-        boolean shouldCrop = shouldCrop(mCroppedImageWidth, mCroppedImageHeight);
+        boolean shouldCrop = shouldCrop(mCroppedImageWidth, mCroppedImageHeight) || !current.isIdentity();
         Log.i(TAG, "Should crop: " + shouldCrop);
 
         if (shouldCrop) {
@@ -168,7 +193,7 @@ public class BitmapCropTask extends AsyncTask<Void, Void, Throwable> {
             }
             return true;
         } else {
-            FileUtils.copyFile(context ,mImageInputUri, mImageOutputUri);
+            FileUtils.copyFile(context, mImageInputUri, mImageOutputUri);
             return false;
         }
     }

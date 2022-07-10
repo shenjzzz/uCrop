@@ -77,7 +77,9 @@ public class CropImageView extends TransformImageView {
 
         final ImageState imageState = new ImageState(
                 mCropRect, RectUtils.trapToRect(mCurrentImageCorners),
-                getCurrentScale(), getCurrentAngle());
+                getCurrentScale(), getCurrentAngle(),
+                mVerticalReflectMatrix, mHorizontalReflectMatrix,
+                mVerticalPerspectiveMatrix, mHorizontalPerspectiveMatrix);
 
         final CropParameters cropParameters = new CropParameters(
                 mMaxResultImageSizeX, mMaxResultImageSizeY,

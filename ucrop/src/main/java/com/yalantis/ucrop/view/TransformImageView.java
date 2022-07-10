@@ -40,6 +40,11 @@ public class TransformImageView extends AppCompatImageView {
     private final float[] mMatrixValues = new float[MATRIX_VALUES_COUNT];
 
     protected Matrix mCurrentImageMatrix = new Matrix();
+    protected Matrix mVerticalPerspectiveMatrix = new Matrix();
+    protected Matrix mHorizontalPerspectiveMatrix = new Matrix();
+    protected Matrix mHorizontalReflectMatrix = new Matrix();
+    protected Matrix mVerticalReflectMatrix = new Matrix();
+
     protected int mThisWidth, mThisHeight;
 
     protected TransformImageListener mTransformImageListener;
@@ -206,9 +211,14 @@ public class TransformImageView extends AppCompatImageView {
 
     @Override
     public void setImageMatrix(Matrix matrix) {
-        super.setImageMatrix(matrix);
+        Matrix current = new Matrix(matrix);
+        current.preConcat(mHorizontalReflectMatrix);
+        current.preConcat(mVerticalReflectMatrix);
+        current.preConcat(mHorizontalPerspectiveMatrix);
+        current.preConcat(mVerticalPerspectiveMatrix);
+        super.setImageMatrix(current);
         mCurrentImageMatrix.set(matrix);
-        updateCurrentImagePoints();
+        updateCurrentImagePoints(current);
     }
 
     @Nullable
@@ -269,43 +279,55 @@ public class TransformImageView extends AppCompatImageView {
 
     /**
      * This method reflect current image and become a horizontal mirror image.
-     * In order to avoid the effects of other transformations such as translation and scaling being reflected,
-     * the reflection transformation should be performed first, so need to use 'pre' method. {@link Matrix#preConcat}
      */
-    public void preReflectHorizontal() {
+    public void postReflectHorizontal() {
         Bitmap bitmap = getViewBitmap();
         if (bitmap == null) {
             return;
         }
-        int width = bitmap.getWidth();
+        float width = bitmap.getWidth();
         if (width <= 0) {
             return;
         }
-        float[] values = {-1, 0, width, 0, 1, 0, 0, 0, 1};
-        Matrix matrix = new Matrix();
-        matrix.setValues(values);
-        mCurrentImageMatrix.preConcat(matrix);
+        if (mHorizontalReflectMatrix.isIdentity()) {
+            float[] values = {-1, 0, width, 0, 1, 0, 0, 0, 1};
+            mHorizontalReflectMatrix.setValues(values);
+        } else {
+            mHorizontalReflectMatrix.reset();
+        }
         setImageMatrix(mCurrentImageMatrix);
     }
 
     /**
      * This method reflect current image and become a vertical mirror image.
      *
-     * @see #preReflectHorizontal()
+     * @see #postReflectHorizontal()
      */
-    public void preReflectVertical() {
+    public void postReflectVertical() {
         Bitmap bitmap = getViewBitmap();
         if (bitmap == null) {
             return;
         }
-        int height = bitmap.getHeight();
+        float height = bitmap.getHeight();
         if (height <= 0) {
             return;
         }
-        float[] values = {1, 0, 0, 0, -1, height, 0, 0, 1};
-        Matrix matrix = new Matrix();
-        matrix.setValues(values);
-        mCurrentImageMatrix.preConcat(matrix);
+        if (mVerticalReflectMatrix.isIdentity()) {
+            float[] values = {1, 0, 0, 0, -1, height, 0, 0, 1};
+            mVerticalReflectMatrix.setValues(values);
+        } else {
+            mVerticalReflectMatrix.reset();
+        }
+        setImageMatrix(mCurrentImageMatrix);
+    }
+
+    public void postPerspectiveVertical(float[] values) {
+        mVerticalPerspectiveMatrix.setValues(values);
+        setImageMatrix(mCurrentImageMatrix);
+    }
+
+    public void postPerspectiveHorizontal(float[] values) {
+        mHorizontalPerspectiveMatrix.setValues(values);
         setImageMatrix(mCurrentImageMatrix);
     }
 
@@ -385,9 +407,9 @@ public class TransformImageView extends AppCompatImageView {
      * {@link #mCurrentImageCorners} and {@link #mCurrentImageCenter} arrays.
      * Those are used for several calculations.
      */
-    private void updateCurrentImagePoints() {
-        mCurrentImageMatrix.mapPoints(mCurrentImageCorners, mInitialImageCorners);
-        mCurrentImageMatrix.mapPoints(mCurrentImageCenter, mInitialImageCenter);
+    private void updateCurrentImagePoints(Matrix matrix) {
+        matrix.mapPoints(mCurrentImageCorners, mInitialImageCorners);
+        matrix.mapPoints(mCurrentImageCenter, mInitialImageCenter);
     }
 
 }

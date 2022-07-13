@@ -408,6 +408,9 @@ public class TransformImageView extends AppCompatImageView {
      * Those are used for several calculations.
      */
     private void updateCurrentImagePoints(Matrix matrix) {
+        if (mInitialImageCorners == null || mInitialImageCenter == null) {
+            return;
+        }
         matrix.mapPoints(mCurrentImageCorners, mInitialImageCorners);
         matrix.mapPoints(mCurrentImageCenter, mInitialImageCenter);
     }
